@@ -47,10 +47,9 @@ import io.airlift.node.NodeModule;
 import io.airlift.tracetoken.TraceTokenModule;
 import org.weakref.jmx.guice.MBeanModule;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+
+import javax.ws.rs.DELETE;
+import java.util.*;
 
 import static com.facebook.presto.server.PrestoSystemRequirements.verifyJvmRequirements;
 import static com.facebook.presto.server.PrestoSystemRequirements.verifySystemTimeIsReasonable;
@@ -62,6 +61,12 @@ import static java.util.Objects.requireNonNull;
 public class PrestoServer
         implements Runnable
 {
+    private static Announcer announcer;
+
+    public enum DatasourceAction {
+        ADD, DELETE;
+    }
+
     public static void main(String[] args)
     {
         new PrestoServer().run();
@@ -118,9 +123,10 @@ public class PrestoServer
 
             injector.getInstance(StaticCatalogStore.class).loadCatalogs();
 
+            announcer = injector.getInstance(Announcer.class);
             // TODO: remove this huge hack
             updateConnectorIds(
-                    injector.getInstance(Announcer.class),
+                    announcer,
                     injector.getInstance(CatalogManager.class),
                     injector.getInstance(ServerConfig.class),
                     injector.getInstance(NodeSchedulerConfig.class));
@@ -131,8 +137,7 @@ public class PrestoServer
             injector.getInstance(PasswordAuthenticatorManager.class).loadPasswordAuthenticator();
             injector.getInstance(EventListenerManager.class).loadConfiguredEventListener();
 
-            injector.getInstance(Announcer.class).start();
-
+            announcer.start();
             log.info("======== SERVER STARTED ========");
         }
         catch (Throwable e) {
@@ -146,7 +151,48 @@ public class PrestoServer
         return ImmutableList.of();
     }
 
-    private static void updateConnectorIds(Announcer announcer, CatalogManager metadata, ServerConfig serverConfig, NodeSchedulerConfig schedulerConfig)
+    public static void updateDatasourcesAnnouncement(String connectorId, DatasourceAction action)
+    {
+        // get existing announcement
+        ServiceAnnouncement announcement = getPrestoAnnouncement(announcer.getServiceAnnouncements());
+
+        // update datasources property
+        Map<String, String> properties = new LinkedHashMap<>(announcement.getProperties());
+        String property = nullToEmpty(properties.get("datasources"));
+        Set<String> datasources = new LinkedHashSet<>(Splitter.on(',').trimResults().omitEmptyStrings().splitToList(property));
+        if (action == DatasourceAction.ADD) {
+            datasources.add(connectorId);
+        }
+        else if (action == DatasourceAction.DELETE) {
+            datasources.remove(connectorId);
+        }
+        properties.put("datasources", Joiner.on(',').join(datasources));
+
+        // update announcement
+        announcer.removeServiceAnnouncement(announcement.getId());
+        announcer.addServiceAnnouncement(serviceAnnouncement(announcement.getType()).addProperties(properties).build());
+        announcer.forceAnnounce();
+    }
+
+    public static void updateDatasourcesAnnouncement(Announcer announcer, String connectorId)
+    {
+        // get existing announcement
+        ServiceAnnouncement announcement = getPrestoAnnouncement(announcer.getServiceAnnouncements());
+
+        // update datasources property
+        Map<String, String> properties = new LinkedHashMap<>(announcement.getProperties());
+        String property = nullToEmpty(properties.get("datasources"));
+        Set<String> datasources = new LinkedHashSet<>(Splitter.on(',').trimResults().omitEmptyStrings().splitToList(property));
+        datasources.add(connectorId);
+        properties.put("datasources", Joiner.on(',').join(datasources));
+
+        // update announcement
+        announcer.removeServiceAnnouncement(announcement.getId());
+        announcer.addServiceAnnouncement(serviceAnnouncement(announcement.getType()).addProperties(properties).build());
+        announcer.forceAnnounce();
+    }
+
+    public static void updateConnectorIds(Announcer announcer, CatalogManager metadata, ServerConfig serverConfig, NodeSchedulerConfig schedulerConfig)
     {
         // get existing announcement
         ServiceAnnouncement announcement = getPrestoAnnouncement(announcer.getServiceAnnouncements());

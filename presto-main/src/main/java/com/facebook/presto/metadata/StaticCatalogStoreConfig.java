@@ -19,46 +19,50 @@ import io.airlift.configuration.Config;
 import io.airlift.configuration.LegacyConfig;
 
 import javax.validation.constraints.NotNull;
-
 import java.io.File;
 import java.util.List;
 
-public class StaticCatalogStoreConfig
-{
+public class StaticCatalogStoreConfig {
     private static final Splitter SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
 
     private File catalogConfigurationDir = new File("etc/catalog/");
     private List<String> disabledCatalogs;
+    private boolean autoDetectCatalog;
 
     @NotNull
-    public File getCatalogConfigurationDir()
-    {
+    public File getCatalogConfigurationDir() {
         return catalogConfigurationDir;
     }
 
     @LegacyConfig("plugin.config-dir")
     @Config("catalog.config-dir")
-    public StaticCatalogStoreConfig setCatalogConfigurationDir(File dir)
-    {
+    public StaticCatalogStoreConfig setCatalogConfigurationDir(File dir) {
         this.catalogConfigurationDir = dir;
         return this;
     }
 
-    public List<String> getDisabledCatalogs()
-    {
+    public List<String> getDisabledCatalogs() {
         return disabledCatalogs;
     }
 
+    public StaticCatalogStoreConfig setDisabledCatalogs(List<String> catalogs) {
+        this.disabledCatalogs = (catalogs == null) ? null : ImmutableList.copyOf(catalogs);
+        return this;
+    }
+
     @Config("catalog.disabled-catalogs")
-    public StaticCatalogStoreConfig setDisabledCatalogs(String catalogs)
-    {
+    public StaticCatalogStoreConfig setDisabledCatalogs(String catalogs) {
         this.disabledCatalogs = (catalogs == null) ? null : SPLITTER.splitToList(catalogs);
         return this;
     }
 
-    public StaticCatalogStoreConfig setDisabledCatalogs(List<String> catalogs)
-    {
-        this.disabledCatalogs = (catalogs == null) ? null : ImmutableList.copyOf(catalogs);
+    public boolean isAutoDetectCatalog() {
+        return autoDetectCatalog;
+    }
+
+    @Config("catalog.auto-detect")
+    public StaticCatalogStoreConfig setAutoDetectCatalog(boolean autoDetectCatalog) {
+        this.autoDetectCatalog = autoDetectCatalog;
         return this;
     }
 }
