@@ -42,21 +42,18 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-public class HandleResolver
-{
+public class HandleResolver {
     private final ConcurrentMap<String, MaterializedHandleResolver> handleResolvers = new ConcurrentHashMap<>();
 
     @Inject
-    public HandleResolver()
-    {
+    public HandleResolver() {
         handleResolvers.put(REMOTE_CONNECTOR_ID.toString(), new MaterializedHandleResolver(new RemoteHandleResolver()));
         handleResolvers.put("$system", new MaterializedHandleResolver(new SystemHandleResolver()));
         handleResolvers.put("$info_schema", new MaterializedHandleResolver(new InformationSchemaHandleResolver()));
         handleResolvers.put("$empty", new MaterializedHandleResolver(new EmptySplitHandleResolver()));
     }
 
-    public void addConnectorName(String name, ConnectorHandleResolver resolver)
-    {
+    public void addConnectorName(String name, ConnectorHandleResolver resolver) {
         requireNonNull(name, "name is null");
         requireNonNull(resolver, "resolver is null");
         MaterializedHandleResolver existingResolver = handleResolvers.putIfAbsent(name, new MaterializedHandleResolver(resolver));
